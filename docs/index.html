@@ -1,0 +1,26 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ather 450X Battery Thermal FEA · RVCE</title><link rel="stylesheet" href="style.css"></head><body>
+<header><div class="wrap">
+<div class="inst"><img src="assets/rvce_logo_white.svg" alt="RVCE logo"><div><b>RV College of Engineering</b><br>Department of Mechanical Engineering</div></div>
+<div class="tag">EXPERIENTIAL LEARNING · PHASE II · ACY 2026-27</div>
+<h1>2-D Finite Element Thermal Analysis of the <span>Ather 450X</span> Battery Pack</h1>
+<p class="sub">Steady &amp; transient · real 21700 cell geometry · verified solver · ANSYS cross-check</p>
+</div></header>
+<div class="wrap">
+<div class="grid">
+ <a class="btn" href="app.html"><b>▶ Live web app</b><span>Run the simulation in your browser</span></a>
+ <a class="btn" href="video.html"><b>🎬 Video demonstration</b><span>96-second walkthrough</span></a>
+ <a class="btn" href="slides.pdf"><b>📊 Presentation</b><span>19 slides (PDF)</span></a>
+ <a class="btn" href="paper.pdf"><b>📄 Technical paper</b><span>4-page paper (PDF)</span></a>
+ <a class="btn" href="https://github.com/fak3eer/ather450x-battery-thermal-fea"><b>💻 Source code</b><span>GitHub repository</span></a>
+</div>
+<section><h2>Key results (60 km/h, 35 °C ambient)</h2>
+<p>Steady-state bound <b>64.5 °C</b>; a full discharge at 60 km/h peaks at <b>50.1 °C</b> (within the 60 °C cell limit); aggressive riding crosses 60 °C after ≈ 25 min; 15 A home charging stays at 39.5 °C. A conductive potting halves the cell-to-cell spread (6.7 → 3.2 K).</p>
+<img class="fig" src="assets/steady_contour.png" alt="Steady temperature field"><img class="fig" src="assets/transient.png" alt="Transient"><img class="fig" src="assets/parametric.png" alt="Parametric study"></section>
+<section><h2>Verification</h2><p>Second-order convergence against an exact orthotropic-cell solution, MMS order 1.96, Grid Convergence Index 0.18 %, energy balance 10⁻⁵ %, and the exported ANSYS APDL deck reproduced to 7×10⁻⁸ K by an independent FE code.</p>
+<img class="fig" src="assets/verification.png" alt="Verification"></section>
+<section><h2>Team</h2><div class="team">
+<div><b>Raghav Mahawar</b><span>1RV23ME086</span></div><div><b>Panyam Chetan Sai Anirv</b><span>1RV23ME079</span></div>
+<div><b>Vishal Kumar Singh</b><span>1RV23ME122</span></div><div><b>Mahesh Kembhavi</b><span>1RV23ME065</span></div></div>
+<p style="margin-top:12px;font-size:14px"><b>Guide:</b> Dr. Shanmukha Nagaraj, Professor &amp; Head, ME · <b>Co-Guides:</b> Dr. Anjaneya G, Dr. Kirthan L J, Professors, ME</p></section>
+</div><footer>RV College of Engineering®, Bengaluru – 560059</footer></body></html>

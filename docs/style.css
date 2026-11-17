@@ -1,0 +1,17 @@
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#18202c;background:#f5f7fb;line-height:1.5}
+header{background:#13306b;color:#fff;padding:22px 20px 28px}
+.wrap{max-width:980px;margin:0 auto;padding:0 18px}
+.inst{display:flex;gap:14px;align-items:center;font-size:14px;opacity:.95}.inst img{height:58px}
+.tag{color:#f2a900;font-weight:700;font-size:12px;letter-spacing:1.5px;margin-top:22px}
+h1{font-size:clamp(24px,5vw,40px);line-height:1.15;margin-top:6px}h1 span{color:#f2a900}
+.sub{color:#cfd9ee;margin-top:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:-18px auto 24px}
+.btn{display:block;background:#fff;border-radius:14px;padding:18px;text-decoration:none;color:#13306b;box-shadow:0 6px 20px rgba(19,48,107,.10);border-top:5px solid #f08a24}
+.btn b{display:block;font-size:18px}.btn span{font-size:13px;color:#5b6576}
+section{background:#fff;border-radius:14px;padding:22px;margin-bottom:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+h2{color:#13306b;font-size:20px;margin-bottom:10px}
+img.fig{width:100%;border-radius:10px;border:1px solid #d9dee7;margin-top:10px}
+.team{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:15px}.team span{color:#5b6576;font-size:13px;display:block}
+footer{text-align:center;color:#5b6576;font-size:13px;padding:20px}
+video{width:100%;border-radius:12px;background:#000}
