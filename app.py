@@ -23,13 +23,15 @@ from core import plots
 from core.ansys_export import same_mesh_apdl, geometry_apdl, geometry_dxf, parse_ansys_csv
 from core.references import ref_markdown
 
-st.set_page_config(page_title="Ather 450X Battery Thermal FEA", page_icon="🔋", layout="wide")
+st.set_page_config(page_title="Ather 450X Battery Thermal FEA", page_icon="🔋", layout="wide",
+                   initial_sidebar_state="collapsed")
 
 # =============================================================================
 # Sidebar inputs
 # =============================================================================
 sb = st.sidebar
-sb.title("Simulation inputs")
+sb.title("Advanced settings")
+sb.caption("Pick a scenario and ambient temperature on the main page. Change these only to explore the model.")
 
 with sb.expander("1 · Cell", expanded=False):
     use_custom = st.toggle("Edit cell parameters", value=False,
@@ -60,7 +62,7 @@ with sb.expander("1 · Cell", expanded=False):
                             help="Arrhenius temperature dependence of resistance. 0 = constant R. "
                                  "Fit to your own HPPC data if available (assumption, not a datasheet value).")
 
-with sb.expander("2 · Pack layout and section", expanded=True):
+with sb.expander("2 · Pack layout and section", expanded=False):
     n_s = st.number_input("Cells in series (S)", 1, 30, 14)
     n_p = st.number_input("Cells in parallel (P)", 1, 30, 12)
     st.caption("14S12P = 168 cells: community-reported for the 450X 2.9 kWh pack [4]; "
@@ -77,7 +79,8 @@ with sb.expander("2 · Pack layout and section", expanded=True):
     pack_depth_mm = st.number_input("Pack depth along cell axis (mm)", 50.0, 800.0, 300.0, 10.0,
                                     help="Used only for the natural-convection length scale of the horizontal faces.")
 
-with sb.expander("3 · Operating case", expanded=True):
+with sb.expander("3 · Custom operating case", expanded=False):
+    st.caption("Used when the main-page scenario is **Custom**.")
     mode = st.radio("Battery state", ["Riding (discharge)", "Charging"], horizontal=True)
     veh = Vehicle(n_series=int(n_s), n_parallel=int(n_p))
     if mode.startswith("Riding"):
@@ -101,8 +104,7 @@ with sb.expander("3 · Operating case", expanded=True):
         P_batt = I_pack * veh.v_pack_nom
     I_cell = I_pack / n_p
 
-with sb.expander("4 · Environment and boundaries", expanded=True):
-    T_amb = st.slider("Ambient air (°C)", 10, 48, 35)
+with sb.expander("4 · Environment and boundaries", expanded=False):
     uf = st.slider("Underbody airflow factor", 0.0, 1.0, 0.5, 0.05,
                    help="Fraction of vehicle speed that reaches the pack underside (assumption).")
     eps = st.slider("Casing emissivity", 0.05, 0.95, 0.30, 0.05,
@@ -123,6 +125,34 @@ with sb.expander("5 · Numerics", expanded=False):
     h_mm_mesh = st.select_slider("Target element size (mm)", [3.0, 2.5, 2.0, 1.5, 1.2, 1.0, 0.8], value=1.5)
     t_end_min = st.slider("Max transient duration (min)", 5, 300, 240, 5)
     dt_s = st.select_slider("Time step (s)", [2, 5, 10, 20, 30, 60], value=10)
+
+# =============================================================================
+# Main page: question, scenario, ambient
+# =============================================================================
+st.title("Ather 450X battery: how hot does it get?")
+st.caption("2-D finite element model of the real 21700-cell pack (14S12P, 168 cells) · "
+           "RV College of Engineering, Mechanical Engineering · Experiential Learning Phase II")
+SCEN = {"City · 40 km/h": ("ride", 40), "Highway · 60 km/h": ("ride", 60), "Fast · 75 km/h": ("ride", 75),
+        "Aggressive riding": ("spirited", 60), "Home charging · 15 A": ("charge", None),
+        "Custom (sidebar)": ("custom", None)}
+cS, cA = st.columns([3, 1])
+scen = cS.segmented_control("Scenario", list(SCEN), default="Highway · 60 km/h", key="scen") or "Highway · 60 km/h"
+T_amb = cA.slider("Ambient temperature (°C)", 15, 48, 35)
+scen_kind, scen_speed = SCEN[scen]
+if scen_kind in ("ride", "spirited"):
+    speed, grade = scen_speed, 0
+    P_batt = min(cruise_power(speed, veh, 0), veh.p_peak / veh.eta_drive)
+    I_pack = pack_current(P_batt, veh)
+elif scen_kind == "charge":
+    speed, grade = 0, 0
+    I_pack = -15.0
+    P_batt = I_pack * veh.v_pack_nom
+I_cell = I_pack / n_p
+if scen_kind == "spirited":
+    # steady "held forever" bound uses the RMS current of the burst cycle (same average I^2 R heat)
+    _Ip = veh.p_peak / veh.eta_drive / veh.v_pack_nom
+    I_cell = math.sqrt((_Ip ** 2 * 15 + I_pack ** 2 * 45) / 60) / n_p
+ride_kind = scen_kind if scen_kind != "custom" else ("ride" if I_cell >= 0 else "charge")
 
 # =============================================================================
 # Build and solve (cached)
@@ -181,53 +211,109 @@ mesh = prob.mesh
 T = res["T"]
 
 # =============================================================================
-# Header and headline results
+# Headline: a realistic full ride (transient until the battery is empty)
 # =============================================================================
-st.title("Ather 450X battery pack: 2-D finite element thermal analysis")
-st.markdown(
-    "A cross-section of the 450X pack is cut **normal to the 21700 cell axes**, so every cell appears at its real "
-    "Ø21.1 mm size inside the holder and the aluminium casing. Heat generation follows the Bernardi energy "
-    "balance, the outer faces lose heat by correlation-based forced/natural convection plus radiation, and the "
-    "field is solved with linear triangular finite elements, at steady state and over time. "
-    "The solver is verified against an analytical solution and a manufactured solution, mesh error is quantified "
-    "with the Grid Convergence Index, and the same model can be exported to ANSYS Mechanical APDL for an "
-    "independent check.")
-
 Tmax = float(T.max())
 cm, cx = res["cm"], res["cx"]
 spread = float(cm.max() - cm.min())
 Qc = res["Q"]
 ok_T = Tmax <= limit
 ok_dT = spread <= 5.0
+USABLE_WH = 2600.0                       # Ather 450X 2.9 kWh pack: 2.6 kWh usable [4]
+I_peak = veh.p_peak / veh.eta_drive / veh.v_pack_nom
 
-m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("Peak temperature", f"{Tmax:.1f} °C", f"{Tmax - limit:+.1f} K vs {limit:.0f} °C limit",
-          delta_color="inverse")
-m2.metric("Hottest-cell mean", f"{cm.max():.1f} °C")
-m3.metric("Cell-to-cell spread", f"{spread:.2f} K", "target ≤ 5 K", delta_color="off")
-m4.metric("Heat per cell", f"{Qc.mean():.3f} W", f"pack {Qc.mean()*n_s*n_p:.0f} W", delta_color="off")
-m5.metric("Pack current", f"{I_pack:.1f} A", f"{I_cell:.2f} A/cell · {P_batt/1000:.2f} kW", delta_color="off")
 
-if ok_T and ok_dT:
-    st.success(f"Steady state within limits: peak {Tmax:.1f} °C ≤ {limit:.0f} °C "
-               f"({'discharge' if I_cell >= 0 else 'charge'} limit, LG M50T datasheet [6]) and cell spread "
-               f"{spread:.1f} K ≤ 5 K.")
+@st.cache_data(show_spinner=False, max_entries=24)
+def ride(key, kind):
+    if kind == "spirited":
+        I_avg = (I_peak * 15 + I_pack * 45) / 60
+        f = lambda t: (I_peak if (t % 60) < 15 else I_pack) / n_p
+        dt = 5.0
+    else:
+        I_avg = abs(I_pack)
+        f = lambda t: I_cell
+        dt = 20.0
+    if kind == "charge":   # 0 -> 80 % of the 2.9 kWh installed capacity
+        t_end = 0.8 * 2900.0 / max(I_avg * veh.v_pack_nom, 1e-6) * 3600
+    else:                  # until the 2.6 kWh usable energy is spent
+        t_end = USABLE_WH / max(I_avg * veh.v_pack_nom, 1e-6) * 3600
+    t_end = min(t_end, 4 * 3600)
+    pr = get_problem(key)
+    r = pr.solve_transient(f, t_end, dt, env.T_amb_C, store_every=10 ** 9)
+    return dict(t=r["t"], Tmax=r["Tmax"], T=r["T"], t_end=t_end, cm=pr.cell_means(r["T"]), I_avg=I_avg)
+
+
+with st.spinner("Simulating the ride..."):
+    rr = ride(key, ride_kind)
+ride_peak = float(rr["Tmax"].max())
+ride_min = rr["t_end"] / 60
+ride_lim = cell.t_max_charge_C if ride_kind == "charge" else cell.t_max_discharge_C
+cross = np.where(rr["Tmax"] > ride_lim)[0]
+what = {"ride": f"A full ride at {speed} km/h, until the battery is empty ({ride_min:.0f} min),",
+        "spirited": f"Aggressive riding (full-throttle bursts every minute) until the battery is empty ({ride_min:.0f} min)",
+        "charge": f"Charging at {abs(I_pack):.0f} A from 0 to 80 % ({ride_min:.0f} min)"}[ride_kind]
+if len(cross) == 0:
+    st.success(f"**Within limits.** {what} peaks at **{ride_peak:.1f} °C**, below the {ride_lim:.0f} °C "
+               f"{'charge' if ride_kind == 'charge' else 'discharge'} limit of the cells (ambient {T_amb} °C).")
 else:
-    msgs = []
-    if not ok_T:
-        msgs.append(f"peak {Tmax:.1f} °C exceeds the {limit:.0f} °C {'discharge' if I_cell >= 0 else 'charge'} limit")
-    if not ok_dT:
-        msgs.append(f"cell-to-cell spread {spread:.1f} K exceeds the 5 K design target")
-    st.warning("Steady state: " + "; ".join(msgs) + ". Remember that steady state is the *long-duration bound*; "
-               "check the Transient tab for a realistic ride.")
+    st.error(f"**Over the limit.** {what} crosses the {ride_lim:.0f} °C cell limit after "
+             f"**{rr['t'][cross[0]] / 60:.0f} min** and reaches {ride_peak:.1f} °C. The battery management system "
+             f"would have to reduce power.")
 
-tabs = st.tabs(["Steady state", "Transient", "Geometry & mesh", "Governing equations",
-                "Verification", "ANSYS cross-check", "Assumptions & references"])
+ride_spread = float(rr["cm"].max() - rr["cm"].min())
+k1, k2, k3 = st.columns(3)
+k1.metric("Peak during the charge" if ride_kind == "charge" else "Peak during the ride", f"{ride_peak:.1f} °C", f"{ride_peak - ride_lim:+.1f} K vs {ride_lim:.0f} °C limit",
+          delta_color="inverse")
+k2.metric("Worst case if held forever", f"{Tmax:.1f} °C",
+          help="Steady state: the temperature the pack would settle at if this load never ended. "
+               "A real ride ends first, so this is an upper bound.")
+k3.metric("Hottest vs coolest cell", f"{ride_spread:.1f} K",
+          help="Temperature difference between the hottest and coolest cell. A common design target is 5 K or less, "
+               "because hotter cells age faster.")
+
+f1, f2 = st.columns([2.2, 1])
+with f1:
+    st.plotly_chart(plots.field_figure(mesh, rr["T"], f"Pack cross-section at the end ({ride_min:.0f} min), °C"),
+                    width="stretch")
+with f2:
+    import plotly.graph_objects as go
+    figt = go.Figure(go.Scatter(x=rr["t"] / 60, y=rr["Tmax"], line=dict(color="#d1495b", width=2.5),
+                                name="Hottest point"))
+    figt.add_hline(y=ride_lim, line_dash="dash", line_color="#8a1c2b", annotation_text=f"limit {ride_lim:.0f} °C")
+    figt.update_layout(height=330, margin=dict(l=10, r=10, t=40, b=10), title="Hottest point over time",
+                       xaxis_title="Time (min)", yaxis_title="°C", showlegend=False)
+    st.plotly_chart(figt, width="stretch")
+
+with st.expander("What am I looking at?"):
+    st.markdown(
+        "- The picture is a slice through the battery pack, cut across the cells. Each circle is one real "
+        "21700 cell (21 mm across); the frame around them is the aluminium casing.\n"
+        "- Current flowing through each cell heats it. That heat has to cross the plastic cell holder and the casing, "
+        "then leave into the air. Moving air under the scooter cools the bottom face more than the others.\n"
+        "- The answer comes from a finite element model: the slice is split into about 40,000 small triangles and "
+        "the heat equation is solved on each. The tabs below show the worst case, the full equations, proof that the "
+        "solver is correct, and files to repeat the analysis in ANSYS.")
+
+tabs = st.tabs(["Worst case (steady)", "Explore over time", "Geometry & mesh", "Equations",
+                "Verification", "ANSYS", "Sources & assumptions"])
 
 # =============================================================================
 # Steady state
 # =============================================================================
 with tabs[0]:
+    st.caption("Steady state = the temperature the pack settles at if this load continues forever. It bounds the "
+               "real ride shown above from above.")
+    if ok_T and ok_dT:
+        st.success(f"Even held forever, the peak ({Tmax:.1f} °C) stays below the {limit:.0f} °C limit and the cell "
+                   f"spread ({spread:.1f} K) below 5 K.")
+    else:
+        msgs = []
+        if not ok_T:
+            msgs.append(f"the peak would reach {Tmax:.1f} °C (limit {limit:.0f} °C)")
+        if not ok_dT:
+            msgs.append(f"the cell spread would reach {spread:.1f} K (target 5 K)")
+        st.info("If this load were held forever, " + " and ".join(msgs) + ". A real ride ends before this; see the "
+                "result at the top of the page.")
     st.plotly_chart(plots.field_figure(mesh, T, "Steady-state temperature field (°C)"), width="stretch")
     c1, c2 = st.columns([3, 2])
     with c1:
